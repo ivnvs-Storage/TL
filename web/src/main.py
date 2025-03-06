@@ -2,7 +2,7 @@ from fastapi import FastAPI, APIRouter
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel
-from src import schemas
+from web.src import schemas
 
 app = FastAPI()
 
@@ -40,7 +40,7 @@ async def get_candles(
         )
     ]
 
-@router_price_processing.post("/update")
+@router_price_processing.patch("/update")
 async def update_prices(
     token: str,
     start_date: datetime,
