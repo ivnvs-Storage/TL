@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - RABBITMQ_URL=${RABBITMQ_URL}
+      - TINKOFF_TOKEN=${TINKOFF_TOKEN}
+    depends_on:
+      - db
+      - redis
+      - rabbitmq
+    volumes:
+      - ./web:/app/web
+      - ./pps:/app/pps
+      - ./pps/src:/app/pps/src
+      - ./pps/adapters:/app/pps/adapters
+      - ./pps/domain:/app/pps/domain
+      - ./pps/aplication:/app/pps/aplication
+      - ./pps/config:/app/pps/config
+      - ./pps/__init__.py:/app/pps/__init__.py
+      - ./.env:/app/.env
+    command: uvicorn web.src.main:app --host 0.0.0.0 --port 8000 --reload
+
+  sge-consumer:
+    build:
+      context: .
+      dockerfile: sge/Dockerfile
+    environment:
+      - RABBITMQ_URL=${RABBITMQ_URL}
+    depends_on:
+      - rabbitmq
+    restart: unless-stopped
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=trading_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"   # порт для AMQP
+      - "15672:15672" # порт для веб-интерфейса управления
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data: 

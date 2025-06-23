@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  sge-consumer:
+    build:
+      context: ..
+      dockerfile: sge/Dockerfile
+    environment:
+      - RABBITMQ_URL=${RABBITMQ_URL}
+    depends_on:
+      - rabbitmq
+    # volumes убраны, всё копируется на этапе сборки
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5673:5672"   # отдельный порт для теста, чтобы не конфликтовать с основным compose
+      - "15673:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+volumes:
+  rabbitmq_data: 

@@ -1,8 +1,11 @@
-from fastapi import FastAPI, APIRouter
+from typing import Annotated
+from fastapi import Depends, FastAPI, APIRouter
 from datetime import datetime
-from typing import List, Optional
-from pydantic import BaseModel
-from src import schemas
+from pps.src.aplication.schemas import UpdateCandlesRequest
+from pps.src.aplication.usecase import Usecase, QueryUsecase
+from pps.src.deps import make_usecase, make_query_usecase
+from pps.src.domain.candle import entity
+from web.src import schemas
 
 app = FastAPI()
 
@@ -10,41 +13,62 @@ router_price_processing = APIRouter(prefix="/price", tags=["price"])
 router_strategy = APIRouter(prefix="/strategy", tags=["strategy"])
 
 
-@router_price_processing.get("/candles")
+@router_price_processing.get("/candles/{token}")
 async def get_candles(
-    start_date: datetime,
-    end_date: datetime,
     token: str,
-    interval: str = "1h"
+    usecase: Annotated[Usecase, Depends(make_usecase)],
 ) -> list[schemas.CandleData]:
     """
     Get candles data for the specified time period.<br>
 
     Args: <br>
-        start_date (datetime): Start date of the period<br>
-        end_date (datetime): End date of the period<br>
-        token (str): Trading instrument identifier<br>
-        interval (str, optional): Candle interval. Defaults to "1h"<br>
+        token (BBG004730N88): Trading instrument identifier<br>
 
     Returns:<br>
         list[CandleData]
     """
+    candles = usecase.get_candles_for_token(token)
     return [
         schemas.CandleData(
-            timestamp=datetime.now(),
-            open=100.0,
-            high=105.0,
-            low=98.0,
-            close=103.0,
-            volume=1000.0
-        )
+            open=candle.open,
+            high=candle.high,
+            low=candle.low,
+            close=candle.close,
+            volume=candle.volume,
+            timestamp=candle.timestamp,
+        ) for candle in candles
     ]
 
-@router_price_processing.post("/update")
-async def update_prices(
+@router_price_processing.get("/send/candles/{token}")
+async def send_candles(
+    token: str,
+    usecase: Annotated[Usecase, Depends(make_usecase)],
+) -> list[schemas.CandleData]:
+    """
+    Update candles data for the specified trading instrument.<br>
+
+    Args:<br>
+        token (BBG004730N88): Trading instrument identifier<br>
+    """
+    candles = usecase.get_candles_for_token(token)
+    await usecase.send_candles_async(candles)
+    return [
+        schemas.CandleData(
+            open=candle.open,
+            high=candle.high,
+            low=candle.low,
+            close=candle.close,
+            volume=candle.volume,
+            timestamp=candle.timestamp,
+        ) for candle in candles
+    ]
+
+@router_price_processing.patch("/update")
+async def update_candles(
     token: str,
     start_date: datetime,
-    end_date: datetime
+    end_date: datetime,
+    usecase: Annotated[Usecase, Depends(make_usecase)],
 ):
     """
     Update price data for the specified trading instrument.<br>
@@ -57,6 +81,11 @@ async def update_prices(
     Returns:<br>
         dict: Operation status<br>
     """
+    usecase.update_candles(UpdateCandlesRequest(
+        token=token,
+        start_time=start_date,
+        end_time=end_date,
+    ))
     return {"status": "success", "message": f"Цены для {token} обновлены"}
 
 # Эндпоинты для стратегий
